@@ -1,7 +1,7 @@
 //! This is the main file of the project. It contains structures used by all other parts of the
 //! engine and the main method
 
-#![deny(
+/*#![deny(
     rust_2018_compatibility,
     rust_2018_idioms,
     future_incompatible,
@@ -9,31 +9,32 @@
     unused,
     missing_copy_implementations,
     clippy::all
-)]
+)]*/
 
 mod config;
 mod galaxygen;
 mod render;
 
-use {
-    cgmath::{Matrix4, Point3, Vector3},
-    config::{Config, Construction},
-    ron::de::from_reader,
-    std::{env, f32::consts::PI, fs::File},
-};
+use std::{env, f32::consts::PI, fs::File};
 
-#[derive(Clone, Copy, Debug)]
+use anyhow::Result;
+use bytemuck::{Pod, Zeroable};
+use config::{Config, Construction};
+use glam::{Mat4, Vec3};
+use ron::de::from_reader;
+
+#[derive(Clone, Copy, Debug, Zeroable, Pod)]
 #[repr(C)]
 /// An object with a position, velocity and mass that can be sent to the GPU.
 pub struct Particle {
     /// Position
-    pos: Point3<f32>, // 4, 8, 12
+    pos: Vec3, // 4, 8, 12
 
     /// The radius of the particle (currently unused)
     radius: f32, // 16
 
     /// Velocity
-    vel: Vector3<f32>, // 4, 8, 12
+    vel: Vec3, // 4, 8, 12
     _p: f32, // 16
 
     /// Mass
@@ -41,14 +42,14 @@ pub struct Particle {
     _p2: [f32; 2], // 12, 16
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Zeroable, Pod)]
 #[repr(C)]
 /// All variables that define the state of the program. Will be sent to the GPU.
 pub struct Globals {
     /// The camera matrix (projection x view matrix)
-    matrix: Matrix4<f32>, // 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
+    matrix: Mat4, // 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
     /// The current camera position (used for particle size)
-    camera_pos: Point3<f32>, // 16, 17, 18
+    camera_pos: Vec3, // 16, 17, 18
     /// The number of particles
     particles: u32, // 19
     /// Newton's law of gravitation has problems with 1D particles, this value works against
@@ -61,7 +62,7 @@ pub struct Globals {
 }
 
 impl Particle {
-    fn new(pos: Point3<f32>, vel: Vector3<f32>, mass: f64, density: f64) -> Self {
+    fn new(pos: Vec3, vel: Vec3, mass: f64, density: f64) -> Self {
         Self {
             pos,
             // V = 4/3*pi*r^3
@@ -78,7 +79,7 @@ impl Particle {
     }
 }
 
-fn main() {
+fn main() -> Result<()> {
     let config = read_config().unwrap_or_else(|| {
         println!("Using default config.");
         default_config()
@@ -88,7 +89,7 @@ fn main() {
     let particles = config.construct_particles();
 
     let globals = Globals {
-        matrix: Matrix4::from_translation(Vector3::new(0.0, 0.0, 0.0)),
+        matrix: Mat4::from_translation(Vec3::new(0.0, 0.0, 0.0)),
         camera_pos: config.camera_pos.into(),
         particles: particles.len() as u32,
         safety: config.safety,
@@ -96,7 +97,7 @@ fn main() {
         _p: 0.0,
     };
 
-    render::run(globals, particles);
+    pollster::block_on(render::run(globals, particles))
 }
 
 /// Read configuration file

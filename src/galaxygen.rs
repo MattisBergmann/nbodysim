@@ -1,14 +1,6 @@
 //! This module can generate spiral galaxies based on some parameters.
 
-use {
-    crate::Particle,
-    cgmath::{
-        prelude::*,
-        {Point3, Vector3},
-    },
-    rand::prelude::*,
-    std::f32::consts::PI,
-};
+use {crate::Particle, glam::Vec3, rand::prelude::*, std::f32::consts::PI};
 
 const G: f64 = 6.67408E-11;
 const ARMS: u32 = 2;
@@ -18,14 +10,14 @@ pub fn generate_galaxy(
     particles: &mut Vec<Particle>,
     amount: u32,
     safety: f64,
-    center_pos: Point3<f32>,
-    center_vel: Vector3<f32>,
+    center_pos: Vec3,
+    center_vel: Vec3,
     center_mass: f64,
-    mut normal: Vector3<f32>,
+    mut normal: Vec3,
 ) {
     // Helpers
     normal = normal.normalize();
-    let tangent = normal.cross(Vector3::new(-normal.z, normal.x, normal.y));
+    let tangent = normal.cross(Vec3::new(-normal.z, normal.x, normal.y));
     let bitangent = normal.cross(tangent);
 
     // Generate center of the galaxy
